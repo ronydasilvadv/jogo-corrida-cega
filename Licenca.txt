@@ -1,0 +1,19 @@
+Olá! Que bom que você está aqui para jogar "Corrida Cega"!
+
+Queremos deixar algumas coisas claras de um jeito simples e amigável:
+
+1.  Seu Jogo Grátis: Este jogo é um presente para você! Você pode usá-lo, copiar e compartilhar com quem quiser, sem pagar nada, nunca.
+
+2.  Como o Jogo Funciona: O "Corrida Cega" foi feito com muito carinho e é oferecido "como está". Isso significa que não podemos prometer suporte técnico ou que ele vai funcionar perfeitamente em todo e qualquer computador. Mas pode ter certeza de que fizemos o nosso melhor!
+
+3.  Ferramentas que Usamos: Para criar o "Corrida Cega", usamos algumas ferramentas incríveis, como Pygame, NumPy, Pyttsx3, Pyperclip e PyInstaller. Elas são projetos abertos e suas licenças permitem que as usemos gratuitamente em nosso jogo, sem custo para você. Um grande "muito obrigado!" a quem as desenvolveu!
+
+4.  Sobre os Direitos do Jogo: O "Corrida Cega" foi criado por Rony. Embora o jogo seja seu para usar e compartilhar, as ferramentas que usamos (as do item 3) têm suas próprias regras e licenças, que respeitamos totalmente.
+
+Ao usar este jogo, você concorda com esses pontos.
+
+Esperamos de coração que você se divirta muito com o "Corrida Cega"!
+
+Atenciosamente,
+Rony
+2025

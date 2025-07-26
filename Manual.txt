@@ -1,0 +1,129 @@
+Manual do Jogo — Corrida Cega
+Corrida Cega é um jogo totalmente em áudio.
+Você controla o personagem usando o teclado.
+Seu desafio é ouvir os sons e desviar dos obstáculos.
+A experiência é baseada exclusivamente na sua audição e nos seus reflexos.
+
+1. Sobre o jogo
+Você corre por um caminho invisível.
+Obstáculos surgem de quatro direções: esquerda, direita, centro e cima.
+O som indica de onde vem o perigo.
+Você deve reagir rápido e com precisão.
+Cada desvio correto aumenta sua pontuação.
+Cada erro tira uma vida.
+Durante o jogo, aparecem caixas bônus.
+Quebre essas caixas para ganhar vidas extras.
+Mas atenção: se você não fizer nada, elas se tornam armadilhas.
+À medida que você avança, o jogo fica mais rápido e mais difícil.
+ 
+2. Requisitos do sistema
+Programa compatível com Windows 7, 8, 8.1, 10 e 11, todos em versão 64 bits.
+Você vai precisar de:
+*
+Placa de som.
+*
+Fones de ouvido são altamente recomendados.
+Com fones, é mais fácil saber a direção do som.
+Sem eles, a experiência fica limitada.
+*
+Não é necessário uso de leitores de tela, porque o jogo usa a fala sapi do Windows. Então se você usa NVDA, Jaws ou qualquer outro leitor, você pode desativá-lo 
+antes de abrir o jogo, caso queira. 
+3. Como instalar e iniciar o jogo
+Passo 1: Descompacte o arquivo ZIP em qualquer pasta.
+Por exemplo: “Área de Trabalho” ou “Meus Jogos”.
+Passo 2: Dentro da pasta, procure o arquivo chamado Corrida_Cega.exe.
+Passo 3: Dê dois cliques ou pressione Enter sobre ele.
+Passo 4: Aguarde o carregamento. Pode levar alguns segundos.
+O jogo abrirá automaticamente no menu principal.
+ 
+4. Controles do teclado
+Durante o jogo, você vai usar:
+*
+Seta para a direita: para desviar de obstáculos que vêm da esquerda.
+*
+Seta para a esquerda: para desviar de obstáculos que vêm da direita.
+*
+Seta para cima: para desviar de obstáculos que vêm do centro.
+*
+Seta para baixo: para desviar de obstáculos que vêm de cima.
+Outros comandos importantes:
+*
+CTRL direito: quebra caixas bônus e ganha uma vida extra.
+*
+Tecla V: informa quantas vidas você ainda tem.
+*
+Tecla Home: pausa ou retoma a música de fundo.
+*
+Tecla Escape: sai do jogo imediatamente.
+ 
+5. Vidas e pontuação
+Você começa com três vidas.
+Cada colisão tira uma.
+O jogo termina quando você perde todas as vidas.
+Ao final da partida, sua pontuação é copiada automaticamente para a área de transferência.
+Você pode colar com CTRL + V em qualquer lugar.
+As informações copiadas incluem:
+*
+Data e hora da partida.
+*
+Nome do computador.
+*
+Nível de dificuldade escolhido.
+*
+Sua pontuação total.
+*
+O nível mais alto que você alcançou.
+ 
+6. Menu principal
+Quando o jogo abre, você está no menu principal.
+Use as teclas de 1 a 9 ou 0 para escolher uma opção.
+Modos de jogo:
+*
+Tecla 1: Fácil. Obstáculos mais lentos. Mais tempo para reagir. Mais caixas bônus.
+*
+Tecla 2: Médio. Dificuldade equilibrada. Obstáculos com velocidade moderada.
+*
+Tecla 3: Difícil. Obstáculos rápidos. Menos caixas bônus.
+*
+Tecla 4: Impossível. Velocidade extrema. Quase nenhuma caixa. Só para os mais ousados.
+Outras opções:
+*
+Tecla 5: Instruções. Ouça novamente os comandos e regras do jogo.
+*
+Tecla 6: Sons do jogo. Treine para reconhecer os sons importantes.
+Inclui:
+Obstáculo no centro.
+Obstáculo por cima.
+Caixa com vida extra.
+Vida extra pegou.
+Colidiu.
+Esquivou com sucesso.
+Os sons da esquerda e da direita são percebidos por onde saem:
+O som à esquerda toca no fone esquerdo.
+O som à direita toca no fone direito.
+*
+Tecla 7: Créditos. Saiba quem criou o jogo e quem colaborou.
+*
+Tecla 8: Teste de áudio. Verifique se o som está funcionando nos três canais: esquerdo, central e direito.
+*
+Tecla 9: Sair do jogo. Fecha o jogo com segurança.
+*
+Tecla 0: Repetir menu. Repete a leitura das opções do menu.
+ 
+7. Dicas para jogar melhor
+Sempre use fones de ouvido.
+Eles são seus olhos no jogo.
+Ajudam você a identificar a direção dos sons com precisão.
+Treine usando a opção 6 do menu.
+Conhecer os sons é essencial para reagir mais rápido.
+Comece pelo modo fácil.
+Com prática, você poderá subir para modos mais difíceis.
+ 
+8. Créditos
+Corrida Cega foi desenvolvido por Rony, com carinho e dedicação.
+Agradecimentos especiais:
+A Deus, pela inspiração;
+À comunidade Pygame, pelas ferramentas oferecidas;
+Às bibliotecas pyperclip, datetime, Pyttsx3 e Numpy, por algumas demais funcionalidades.
+A todos que ajudaram o desenvolvedor com sugestões, feedbacks e testes pré-projeto;
+E a você, jogador, por experimentar e se divertir com Corrida Cega!
