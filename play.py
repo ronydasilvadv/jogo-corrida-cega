@@ -3,13 +3,13 @@ import pygame
 import random
 import time
 import numpy as np
-import pyttsx3
 import pyperclip
 from datetime import datetime
 import threading
 import socket
 import os
 import sys
+import wx
 
 # Variáveis Globais de Controle
 jogo_encerrar = False
@@ -18,139 +18,6 @@ jogo_encerrar = False
 last_home_press_time = 0
 last_v_press_time = 0
 debounce_interval = 0.3
-
-# Configuração de Voz SAPI, pyttsx3
-voz_sapi = None
-voz_sapi_ocupada = False # Variável global controlada pelos callbacks
-voz_sapi_lock = threading.Lock()
-voz_sapi_terminou_evento = threading.Event()
-
-# NOVA THREAD PARA EXECUTAR O SAPI
-sapi_thread = None
-
-def run_sapi_engine():
-    """Função para ser executada na thread persistente do SAPI."""
-    global voz_sapi
-    if voz_sapi:
-        try:
-            # print("DEBUG: [SAPI ENGINE THREAD] Iniciando runAndWait em thread dedicada.")
-            voz_sapi.runAndWait() # Loop principal do SAPI
-            # print("DEBUG: [SAPI ENGINE THREAD] runAndWait terminou.")
-        except Exception as e:
-            # print(f"ERRO: [SAPI ENGINE THREAD] Exceção na thread do SAPI: {e}")
-            global jogo_encerrar
-            jogo_encerrar = True # Se o motor falha, encerra o jogo
-
-def inicializar_voz_sapi():
-    """Inicializa o pyttsx3 (SAPI) de forma segura e inicia sua thread."""
-    global voz_sapi, jogo_encerrar, sapi_thread, voz_sapi_ocupada
-
-    try:
-        voz_sapi = pyttsx3.init(driverName='sapi5', debug=False)
-        voz_sapi.setProperty('rate', 225)
-        voz_sapi.connect('finished-utterance', on_speech_end)
-
-        # Inicia a thread do motor do SAPI UMA VEZ
-        sapi_thread = threading.Thread(target=run_sapi_engine, daemon=True)
-        sapi_thread.start()
-        # print("INFO: Thread para runAndWait do pyttsx3 iniciada.")
-
-        # Teste rápido do SAPI após inicialização da thread
-        try:
-            # print("DEBUG: [SAPI TESTE] Tentando uma fala de teste após inicialização da thread do SAPI...")
-            voz_sapi.say("Carregando...")
-
-            # Aguarda o evento de término da fala de teste ou um timeout
-            # test_start = time.time() # Variável não usada
-            voz_sapi_terminou_evento.wait(timeout=2.0) # Espera até 2 segundos para a fala de teste terminar
-
-            if voz_sapi_ocupada: # Se ainda estiver ocupado após o wait, algo deu errado
-                # print("AVISO: [SAPI TESTE] A fala de teste inicial não foi concluída. SAPI pode estar com problemas.")
-                voz_sapi.stop()
-                voz_sapi_ocupada = False
-                voz_sapi_terminou_evento.set()
-            # else:
-                # print("DEBUG: [SAPI TESTE] Fala de teste inicial aparentemente bem-sucedida.")
-
-        except Exception as test_e:
-            # print(f"AVISO: [SAPI TESTE] Falha na fala de teste inicial do SAPI: {test_e}. SAPI pode não funcionar.")
-            pass # Não mostra erros de teste para o usuário final
-
-        # print("INFO: pyttsx3 (SAPI) inicializado com sucesso.")
-
-    except Exception as e:
-        # print(f"ERRO CRÍTICO: Falha ao inicializar pyttsx3 (SAPI): {e}. O jogo não pode continuar sem voz.")
-        voz_sapi = None
-        jogo_encerrar = True
-
-def on_speech_end(name, completed):
-    """Callback chamado pelo pyttsx3 quando uma fala é concluída."""
-    global voz_sapi_ocupada
-    with voz_sapi_lock:
-        voz_sapi_ocupada = False
-        voz_sapi_terminou_evento.set()
-        # print(f"DEBUG: [FALA CALLBACK] Fala '{name}' concluída. voz_sapi_ocupada resetada para False via callback.")
-
-
-# Funções de Fala Universais
-
-def falar_universal(texto, prioridade=False):
-    """
-    Função principal para todas as falas do jogo.
-    Utiliza exclusivamente o SAPI (pyttsx3) de forma assíncrona e não bloqueante.
-    Se 'prioridade' for True, tentará interromper a fala atual para falar este texto.
-    """
-    global voz_sapi_ocupada
-    if voz_sapi is None:
-        # print(f"AVISO: Tentativa de falar '{texto}', mas SAPI não está inicializado.")
-        return
-
-    with voz_sapi_lock:
-        if voz_sapi_ocupada:
-            if prioridade:
-                # print(f"DEBUG: [FALA] Prioridade ativada. Parando fala atual para '{texto}'.")
-                try:
-                    voz_sapi.stop()
-                    time.sleep(0.05)
-                except RuntimeError as e:
-                    # print(f"AVISO: [FALA] RuntimeError ao tentar parar SAPI para prioridade: {e}")
-                    pass
-                finally:
-                    voz_sapi_ocupada = False
-                    voz_sapi_terminou_evento.set()
-            # else:
-                # print(f"DEBUG: [FALA] SAPI já ocupado. Não pode falar '{texto}' agora.")
-                return
-
-        if not voz_sapi_ocupada:
-            voz_sapi_ocupada = True
-            voz_sapi_terminou_evento.clear()
-            # print(f"DEBUG: [FALA] Solicitando fala: '{texto}' (voz_sapi_ocupada=True)")
-
-            voz_sapi.say(texto)
-
-
-def parar_fala_voz():
-    """
-    Interrompe a fala atual do SAPI de forma imediata e reseta a flag de ocupação.
-    Também limpa o buffer de eventos do Pygame.
-    """
-    global voz_sapi_ocupada
-    if voz_sapi is not None:
-        with voz_sapi_lock:
-            if voz_sapi_ocupada:
-                try:
-                    voz_sapi.stop()
-                    # print("DEBUG: [FALA] SAPI stop() chamado.")
-                    time.sleep(0.05)
-                except RuntimeError as e:
-                    # print(f"AVISO: [FALA] RuntimeError ao tentar parar SAPI: {e}")
-                    pass
-                finally:
-                    voz_sapi_ocupada = False
-                    voz_sapi_terminou_evento.set()
-                    # print("DEBUG: [FALA] voz_sapi_ocupada resetada para False na parada.")
-    pygame.event.clear()
 
 # Inicialização do Pygame
 try:
@@ -171,7 +38,6 @@ except Exception as e:
 tela = pygame.display.set_mode((100, 100))
 pygame.display.set_caption("Corrida Cega")
 # print("INFO: Janela do Pygame criada com tamanho (100, 100).")
-
 
 # Caminhos dos Sons
 sons_paths = {
@@ -222,18 +88,7 @@ for key, value in sons_paths.items():
             # print(f"ERRO: Arquivo de som '{value}' não encontrado para '{key}'. Este som não tocará.")
             loaded_sounds[key] = None
 
-
-# Funções Auxiliares de Áudio e Voz
-
-def falar_pontuacao_total(pontos):
-    falar_universal(f"Sua pontuação é de {pontos} pontos.", prioridade=True)
-
-def falar_nivel_progresso(pontos_atuais):
-    nivel = (pontos_atuais // 10) + 1
-    falar_universal(f"Nível {nivel}", prioridade=True)
-
-def falar_vidas_restantes(colisoes_restantes):
-    falar_universal(f"Você tem {colisoes_restantes} vidas restantes." if colisoes_restantes != 1 else "Você tem 1 vida restante.", prioridade=True)
+# Funções Auxiliares de Áudio
 
 def tocar_som(nome_som):
     """Toca um som curto (Sound object) de forma não bloqueante."""
@@ -287,7 +142,6 @@ def tocar_e_esperar(som_nome):
     except Exception as e:
         # print(f"ERRO inesperado ao tocar e esperar som '{som_nome}': {e}")
         pass # Não exibe erro para o usuário final
-
 
 def tocar_som_direcional(nome_evento, direcao, sound_obj=None):
     """
@@ -355,154 +209,50 @@ def get_all_pygame_events():
             jogo_encerrar = True
     return events
 
-
-# Função Auxiliar para Processamento de Eventos de Menu com Controle SAPI
-def processar_eventos_menu_com_sapi_check():
-    """
-    Processa eventos Pygame em loops de menu, garantindo interrupção de fala
-    e retorno de input válido. Monitora o estado do SAPI para evitar "puladas".
-    Retorna a tecla pressionada ou None se nenhum input relevante.
-    """
-    global jogo_encerrar
-    for evento in get_all_pygame_events(): # Usa a função unificada
-        if jogo_encerrar: # Verifica se um evento QUIT ou ESC foi detectado na coleta unificada
-            return 'QUIT'
-        elif evento.type == pygame.KEYDOWN:
-            parar_fala_voz()
-            return evento.unicode
-    return None
-
-def falar_opcoes_segmentado(opcoes_list):
-    """
-    Fala uma lista de frases segmentadamente, permitindo interrupção
-    e garantindo que cada frase seja falada antes da próxima.
-    Retorna a tecla pressionada que interrompeu a fala, ou None.
-    """
-    global voz_sapi_ocupada, jogo_encerrar
-    for frase in opcoes_list:
-        if jogo_encerrar:
-            return 'QUIT'
-
-        # Espera ativa para a fala anterior terminar e o SAPI estar livre
-        wait_start_time = time.time()
-        # print(f"DEBUG: [SAPI_SEGMENTADO] Aguardando SAPI ficar livre para '{frase}'. Ocupado: {voz_sapi_ocupada}")
-
-        # Espera pelo evento ou timeout, permitindo input
-        while voz_sapi_ocupada and not voz_sapi_terminou_evento.is_set() and (time.time() - wait_start_time < 10):
-            input_during_wait = processar_eventos_menu_com_sapi_check()
-            if input_during_wait is not None:
-                return input_during_wait
-            if jogo_encerrar: return 'QUIT'
-            pygame.time.Clock().tick(60)
-
-        # Se a flag ainda está True e o evento não foi setado após o timeout, algo está errado
-        if voz_sapi_ocupada and not voz_sapi_terminou_evento.is_set():
-            # print(f"AVISO: [SAPI_SEGMENTADO] Timeout ({10}s) esperando SAPI liberar. Forçando parada para '{frase}'.")
-            parar_fala_voz()
-
-        if jogo_encerrar: return 'QUIT'
-
-        # Tenta falar a nova frase
-        falar_universal(frase)
-
-        # Pequena pausa ativa para SAPI iniciar a fala e checar input
-        # print(f"DEBUG: [SAPI_SEGMENTADO] Falando: '{frase}'. Aguardando término ou input.")
-        current_segment_start = time.time()
-        # Tempo de espera aumentado para 8 segundos para frases mais longas
-        while not voz_sapi_terminou_evento.is_set() and (time.time() - current_segment_start < 8):
-            input_event = processar_eventos_menu_com_sapi_check()
-            if input_event is not None:
-                return input_event
-            if jogo_encerrar: return 'QUIT'
-            pygame.time.Clock().tick(60)
-
-        voz_sapi_terminou_evento.clear()
-        # print(f"DEBUG: [SAPI_SEGMENTADO] Segmento para '{frase}' finalizado (ou interrompido/timeout).")
-
-    # Se todas as frases foram faladas sem interrupção, aguarda um input final
-    while True:
-        input_final = processar_eventos_menu_com_sapi_check()
-        if input_final is not None:
-            return input_final
-        if jogo_encerrar:
-            return 'QUIT'
-        pygame.time.Clock().tick(60)
-
-# Submenu de Teste de Sons
+# Submenu de Teste de Sons usando dialogs simples
 def exibir_submenu_sons():
-    """Exibe e gerencia o submenu para teste de sons."""
-
-    opcoes_sons = [
-        "Menu de sons.",
-        "1. Caixa com Vida Extra.",
-        "2. Pegou vida extra.",
-        "3. colidiu com obstáculo.",
-        "4. obstáculo acima.",
-        "5. obstáculo no centro.",
-        "6. esquivou com sucesso.",
-        "Pressione zero para voltar ao menu principal."
+    """Exibe o submenu para teste de sons usando dialogs."""
+    opcoes = [
+        "Caixa com Vida Extra",
+        "Pegou vida extra",
+        "Colidiu com obstáculo",
+        "Obstáculo acima",
+        "Obstáculo no centro",
+        "Esquivou com sucesso",
+        "Voltar ao menu principal"
     ]
-
-    selecionando_som = True
-    while selecionando_som:
-        input_tecla = falar_opcoes_segmentado(opcoes_sons)
-
-        if input_tecla == 'QUIT':
-            selecionando_som = False
+    
+    while True:
+        dlg = wx.SingleChoiceDialog(None, "Escolha um som para testar:", "Menu de Sons", opcoes)
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            selection = dlg.GetSelection()
+            
+            if selection == 0:
+                tocar_som("caixa")
+            elif selection == 1:
+                tocar_som("vida")
+            elif selection == 2:
+                tocar_som("colisao")
+            elif selection == 3:
+                tocar_som("cima")
+            elif selection == 4:
+                tocar_som("centro")
+            elif selection == 5:
+                tocar_som("desviou")
+            elif selection == 6:
+                dlg.Destroy()
+                break
+        else:
+            dlg.Destroy()
             break
+        
+        dlg.Destroy()
 
-        # CORREÇÃO AQUI: Tratar '0' como saída do submenu
-        if input_tecla == '0':
-            falar_universal("Você está no menu principal.")
-            selecionando_som = False
-            parar_fala_voz() # Garantir que a fala pare
-            time.sleep(0.5) # Pequena pausa para a fala terminar
-            continue # Continua o loop externo, mas a flag `selecionando_som` já é False
-
-        try:
-            opcao_digitada = int(input_tecla) if input_tecla and isinstance(input_tecla, str) and input_tecla.isdigit() else -1
-        except (ValueError, TypeError):
-            opcao_digitada = -1
-
-        parar_fala_voz()
-
-        if opcao_digitada == 1:
-            falar_universal("Caixa com vida extra.")
-            tocar_som("caixa") # Usar tocar_som para ser não bloqueante aqui
-        elif opcao_digitada == 2:
-            falar_universal("Pegou vida extra.")
-            tocar_som("vida") # Usar tocar_som para ser não bloqueante aqui
-        elif opcao_digitada == 3:
-            falar_universal("Colidiu com obstáculo.")
-            tocar_som("colisao") # Usar tocar_som para ser não bloqueante aqui
-        elif opcao_digitada == 4:
-            falar_universal("Obstáculo acima.")
-            tocar_som("cima") # Usar tocar_som para ser não bloqueante aqui
-        elif opcao_digitada == 5:
-            falar_universal("Obstáculo no centro.")
-            tocar_som("centro") # Usar tocar_som para ser não bloqueante aqui
-        elif opcao_digitada == 6:
-            falar_universal("Esquivou com sucesso.")
-            tocar_som("desviou") # Usar tocar_som para ser não bloqueante aqui
-        else: # Já tratamos o '0' acima, então qualquer outra coisa aqui é inválida
-            falar_universal("Opção inválida, digite um número de 1 a 6, ou 0 para voltar ao menu.")
-
-        if selecionando_som: # Só pausa se ainda estiver no submenu
-            start_response_pause = time.time()
-            while time.time() - start_response_pause < 1.0:
-                input_check = processar_eventos_menu_com_sapi_check()
-                if input_check == 'QUIT':
-                    selecionando_som = False
-                    break
-                pygame.time.Clock().tick(60)
-
-
-# Menu de Teste de Autofalantes
+# Menu de Teste de Autofalantes usando dialogs
 def exibir_teste_autofalantes():
     """Toca sons sequencialmente nos autofalantes esquerdo, centro e direito para calibração."""
     global jogo_encerrar
-
-    falar_universal("Testando autofalantes: Tecle qualquer coisa para voltar ao menu.")
 
     sound_for_test = None
     try:
@@ -513,215 +263,171 @@ def exibir_teste_autofalantes():
             if playable_sounds:
                 sound_for_test = playable_sounds[0]
     except IndexError:
-        # print("AVISO: Nenhum som disponível para o teste de autofalantes.")
-        falar_universal("Não foi possível encontrar um som para testar os autofalantes.")
-        time.sleep(1.0)
+        wx.MessageBox("Não foi possível encontrar um som para testar os autofalantes.", "Erro", wx.OK | wx.ICON_ERROR)
         return
 
     if sound_for_test is None:
-        falar_universal("Não foi possível encontrar um som para testar os autofalantes.")
-        time.sleep(1.0)
+        wx.MessageBox("Não foi possível encontrar um som para testar os autofalantes.", "Erro", wx.OK | wx.ICON_ERROR)
         return
 
-    testando = True
-    while testando and not jogo_encerrar:
-        falar_universal("Esquerda.")
-        tocar_som_direcional("teste_autofalante_base", "esquerda", sound_obj=sound_for_test)
+    # Testa os autofalantes sequencialmente
+    wx.MessageBox("Testando autofalante esquerdo...", "Teste de Autofalantes", wx.OK | wx.ICON_INFORMATION)
+    tocar_som_direcional("teste_autofalante_base", "esquerda", sound_obj=sound_for_test)
+    time.sleep(1.5)
+    
+    wx.MessageBox("Testando autofalante centro...", "Teste de Autofalantes", wx.OK | wx.ICON_INFORMATION)
+    tocar_som_direcional("teste_autofalante_base", "centro", sound_obj=sound_for_test)
+    time.sleep(1.5)
+    
+    wx.MessageBox("Testando autofalante direito...", "Teste de Autofalantes", wx.OK | wx.ICON_INFORMATION)
+    tocar_som_direcional("teste_autofalante_base", "direita", sound_obj=sound_for_test)
+    time.sleep(1.5)
+    
+    wx.MessageBox("Teste de autofalantes concluído.", "Teste de Autofalantes", wx.OK | wx.ICON_INFORMATION)
 
-        segment_duration = 1.5
-        segment_start_time = time.time()
-        while time.time() - segment_start_time < segment_duration:
-            input_test = processar_eventos_menu_com_sapi_check()
-            if input_test is not None:
-                testando = False
-                break
-            if jogo_encerrar: break
-            pygame.time.Clock().tick(60)
-        if not testando or jogo_encerrar: break
-
-        falar_universal("Centro.")
-        tocar_som_direcional("teste_autofalante_base", "centro", sound_obj=sound_for_test)
-
-        segment_start_time = time.time()
-        while time.time() - segment_start_time < segment_duration:
-            input_test = processar_eventos_menu_com_sapi_check()
-            if input_test is not None:
-                testando = False
-                break
-            if jogo_encerrar: break
-            pygame.time.Clock().tick(60)
-        if not testando or jogo_encerrar: break
-
-        falar_universal("Direita.")
-        tocar_som_direcional("teste_autofalante_base", "direita", sound_obj=sound_for_test)
-
-        segment_start_time = time.time()
-        while time.time() - segment_start_time < segment_duration:
-            input_test = processar_eventos_menu_com_sapi_check()
-            if input_test is not None:
-                testando = False
-                break
-            if jogo_encerrar: break
-            pygame.time.Clock().tick(60)
-        if not testando or jogo_encerrar: break
-
-        falar_universal("Repetindo teste, tecle algo para voltar ao menu.")
-
-        waiting_for_exit = True
-        wait_start_time = time.time()
-        while waiting_for_exit and (time.time() - wait_start_time < 5):
-            input_test = processar_eventos_menu_com_sapi_check()
-            if input_test is not None:
-                testando = False
-                waiting_for_exit = False
-                break
-            if jogo_encerrar:
-                testando = False
-                break
-            pygame.time.Clock().tick(60)
-
-        if not waiting_for_exit:
-            break
-
-    falar_universal("Teste terminado.")
-    # Pequeno atraso para a fala de finalização do teste terminar antes de voltar ao menu
-    voz_sapi_terminou_evento.wait(timeout=2)
-    if voz_sapi_ocupada:
-        parar_fala_voz()
-    time.sleep(0.5)
+# Classe do Menu Principal usando wxPython
+class MenuPrincipal(wx.Frame):
+    def __init__(self):
+        super().__init__(None, title="Corrida Cega - Menu Principal", size=(400, 500))
+        
+        self.nivel_dificuldade_escolhido = 0
+        self.selected_index = 0
+        
+        # Criar painel principal
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Título
+        title = wx.StaticText(panel, label="Corrida Cega")
+        title_font = wx.Font(18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        title.SetFont(title_font)
+        sizer.Add(title, 0, wx.ALL | wx.CENTER, 20)
+        
+        # Lista de opções
+        self.opcoes = [
+            "Modo Fácil",
+            "Modo Médio", 
+            "Modo Difícil",
+            "Modo Impossível",
+            "Exibir Instruções",
+            "Exibir Sons do Jogo",
+            "Exibir Créditos",
+            "Testar Autofalantes",
+            "Sair do Jogo"
+        ]
+        
+        # ListBox para as opções
+        self.list_box = wx.ListBox(panel, choices=self.opcoes, style=wx.LB_SINGLE)
+        self.list_box.SetSelection(0)
+        sizer.Add(self.list_box, 1, wx.ALL | wx.EXPAND, 10)
+        
+        # Botão de confirmação
+        btn_confirmar = wx.Button(panel, label="Confirmar")
+        sizer.Add(btn_confirmar, 0, wx.ALL | wx.CENTER, 10)
+        
+        # Eventos
+        self.Bind(wx.EVT_LISTBOX_DCLICK, self.on_confirmar)
+        btn_confirmar.Bind(wx.EVT_BUTTON, self.on_confirmar)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+        
+        # Eventos de teclado
+        self.list_box.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        
+        panel.SetSizer(sizer)
+        self.Center()
+        
+    def on_key_down(self, event):
+        key_code = event.GetKeyCode()
+        if key_code == wx.WXK_RETURN or key_code == wx.WXK_SPACE:
+            self.on_confirmar(event)
+        else:
+            event.Skip()
+    
+    def on_confirmar(self, event):
+        selection = self.list_box.GetSelection()
+        
+        if 0 <= selection <= 3:  # Modos de dificuldade
+            self.nivel_dificuldade_escolhido = selection + 1
+            self.Close()
+        elif selection == 4:  # Instruções
+            instrucoes = ("Você está passando por um local cheio de obstáculos que impedem a sua corrida. "
+                         "Você cada vez corre mais rápido, mas obstáculos também vem cada vez mais rápido!\n\n"
+                         "Controles:\n"
+                         "• Seta DIREITA: desvia dos obstáculos que vem da esquerda\n"
+                         "• Seta ESQUERDA: desvia dos que vem à direita\n"
+                         "• Seta CIMA: desvia dos que vem no centro\n"
+                         "• Seta BAIXO: desvia dos que vem de cima\n"
+                         "• CTRL DIREITO: quebra as caixas bônus que tem vida extra\n"
+                         "• V: informa suas vidas atuais\n"
+                         "• HOME: pausa e retoma a música de fundo\n"
+                         "• ESCAPE: sai do jogo a qualquer momento\n\n"
+                         "Quando suas vidas chegarem a 0, você terá sua pontuação "
+                         "automaticamente copiada para sua área de transferência.\n\n"
+                         "É importante conhecer os sons do jogo na opção 'Exibir Sons do Jogo'. "
+                         "Boa sorte!")
+            wx.MessageBox(instrucoes, "Instruções", wx.OK | wx.ICON_INFORMATION)
+        elif selection == 5:  # Sons do jogo
+            exibir_submenu_sons()
+        elif selection == 6:  # Créditos
+            creditos = ("Jogo desenvolvido por Rony.\n\n"
+                       "Agradecimentos especiais a:\n"
+                       "• Deus pela capacitação\n"
+                       "• Apoiadores pelos exaustivos testes e suporte\n"
+                       "• Comunidade Pygame por suas ferramentas\n"
+                       "• Numpy pelas funcionalidades de áudio\n"
+                       "• E a você, pelo prestígio.\n\n"
+                       "Divirta-se!")
+            wx.MessageBox(creditos, "Créditos", wx.OK | wx.ICON_INFORMATION)
+        elif selection == 7:  # Teste autofalantes
+            exibir_teste_autofalantes()
+        elif selection == 8:  # Sair
+            global jogo_encerrar
+            jogo_encerrar = True
+            self.Close()
+    
+    def on_close(self, event):
+        self.Destroy()
 
 # --- Loop Principal do Menu ---
 def exibir_menu_principal():
-    """Exibe e gerencia o menu principal do jogo."""
-    nivel_dificuldade_escolhido = 0
+    """Exibe e gerencia o menu principal do jogo usando wxPython."""
     global jogo_encerrar
+    
+    app = wx.App()
+    frame = MenuPrincipal()
+    frame.Show()
+    app.MainLoop()
+    
+    if jogo_encerrar:
+        return 0
+    
+    return frame.nivel_dificuldade_escolhido
 
-    menu_opcoes = [
-        "Qual sua opção?",
-        "1 modo fácil.",
-        "2 modo médio.",
-        "3 modo difícil.",
-        "4 modo impossível.",
-        "5 exibe instruções.",
-        "6 exibe os sons do jogo.",
-        "7 exibe créditos.",
-        "8 testa os autofalantes.",
-        "9 sai do jogo.",
-        "Zero repete as opções."
-    ]
-
-    selecionando_menu = True
-    while selecionando_menu and not jogo_encerrar:
-        input_tecla = falar_opcoes_segmentado(menu_opcoes)
-
-        if input_tecla == 'QUIT': # Captura QUIT do processar_eventos_menu_com_sapi_check
-            selecionando_menu = False
-            break
-
-        try:
-            opcao_digitada = int(input_tecla) if input_tecla and isinstance(input_tecla, str) and input_tecla.isdigit() else -1
-        except (ValueError, TypeError):
-            opcao_digitada = -1
-
-        parar_fala_voz()
-
-        if 1 <= opcao_digitada <= 4:
-            nivel_dificuldade_escolhido = opcao_digitada
-            selecionando_menu = False
-        elif opcao_digitada == 5:
-            falar_universal("Você está passando por um local cheio de obstáculos que impedem a sua corrida. Você cada vez corre mais rápido, mas obstáculos também vem cada vez mais rápido! Seta para a direita desvia dos obstáculos que vem da esquerda. Seta esquerda, dos que vem à direita. Seta para cima, dos que vem no centro. Seta para baixo, dos que vem de cima. Control direito, quebra as caixas bônus que tem vida extra, mas que podem ter inimigos se você não as quebrar. v informa suas vidas atuais. home pausa e retoma a música de fundo. Escape sai do jogo a qualquer momento. Quando suas vidas chegarem a 0, você terá sua pontuação automaticamente copiada para sua área de transferência. É importante conhecer os sons do jogo na opção 6 do menu principal. Os sons que ali não forem exibidos se referem a obstáculos. Boa sorte! Voltando ao menu.")
-            voz_sapi_terminou_evento.wait(timeout=60) # Espera mais tempo pelas instruções
-            if voz_sapi_ocupada: parar_fala_voz()
-        elif opcao_digitada == 6:
-            exibir_submenu_sons()
-        elif opcao_digitada == 7:
-            falar_universal("Jogo desenvolvido por Rony. Agradecimentos especiais a: Deus pela capacitação; Apoiadores pelos exaustivos testes e suporte; Comunidade Pygame por suas ferramentas; Pyttsx3 e Numpy pelas funcionalidades de áudio; E a você, pelo prestígio. Divirta-se! Você está de volta ao menu.")
-            voz_sapi_terminou_evento.wait(timeout=20) # Espera mais tempo pelos créditos
-            if voz_sapi_ocupada: parar_fala_voz()
-        elif opcao_digitada == 8:
-            exibir_teste_autofalantes()
-        elif opcao_digitada == 9:
-            jogo_encerrar = True
-            selecionando_menu = False
-        elif opcao_digitada == 0:
-            falar_universal("Repetindo.")
-        else:
-            falar_universal("Opção inválida, tente novamente.")
-
-        if selecionando_menu and not jogo_encerrar: # Só pausa se ainda estiver no menu e não for sair
-            start_response_pause = time.time()
-            while time.time() - start_response_pause < 1.0:
-                input_check = processar_eventos_menu_com_sapi_check()
-                if input_check == 'QUIT':
-                    selecionando_menu = False
-                    break
-                pygame.time.Clock().tick(60)
-
-    return nivel_dificuldade_escolhido
-
-# Jogo Principal
+# Jogo Principal (mantido intacto)
 def iniciar_jogo():
     """Inicia e gerencia o loop principal do jogo."""
     global jogo_encerrar, last_home_press_time, last_v_press_time, debounce_interval
 
-    # Loop de aquecimento do Pygame/SAPI
-    # print("DEBUG: Entrando no loop de aquecimento do Pygame/SAPI para estabilização...")
+    # Loop de aquecimento do Pygame
     warmup_start_time = time.time()
     warmup_duration = 2
 
     while time.time() - warmup_start_time < warmup_duration:
         get_all_pygame_events() # Coleta eventos para detectar QUIT
         if jogo_encerrar:
-            # print("DEBUG: QUIT detectado durante o aquecimento. Encerrando o jogo.")
             return
         pygame.time.Clock().tick(60)
         time.sleep(0.01)
 
     if jogo_encerrar:
-        # print("DEBUG: Jogo já marcado para encerrar após aquecimento. Saindo.")
-        return
-
-    inicializar_voz_sapi()
-
-    if jogo_encerrar:
-        # print("DEBUG: SAPI falhou ao inicializar, ou erro crítico. Encerrando o jogo.")
-        return
-
-    falar_universal("Boas vindas ao Corrida Cega")
-    # print("DEBUG: [INIT] Aguardando a fala de boas-vindas ('Bem-vindo...') terminar ou timeout.")
-
-    sapi_welcome_start = time.time()
-    max_sapi_welcome_wait = 5
-
-    while (time.time() - sapi_welcome_start < max_sapi_welcome_wait) and (not voz_sapi_terminou_evento.is_set()):
-        get_all_pygame_events() # Coleta eventos para detectar QUIT
-        if jogo_encerrar:
-            # print("DEBUG: QUIT detectado durante a espera da fala de boas-vindas. Encerrando o jogo.")
-            break
-        pygame.time.Clock().tick(60)
-        time.sleep(0.01)
-
-    if voz_sapi_ocupada:
-        # print("AVISO: [INIT] A fala de boas-vindas pode não ter terminado a tempo. Forçando liberação do SAPI.")
-        parar_fala_voz()
-
-    if jogo_encerrar:
-        # print("DEBUG: Jogo encerrado pelo usuário ou durante a fala inicial. Saindo.")
         return
 
     nivel_dificuldade_escolhido = exibir_menu_principal()
 
-    if jogo_encerrar:
-        # print("DEBUG: Jogo encerrado pelo usuário no menu principal. Saindo.")
+    if jogo_encerrar or nivel_dificuldade_escolhido == 0:
         return
 
     tocar_e_esperar("inicio")
-
-    falar_universal("Vamos lá!")
-    voz_sapi_terminou_evento.wait(timeout=2)
-    if voz_sapi_ocupada:
-        parar_fala_voz()
-
     iniciar_musica_fundo()
 
     colisoes = 0
@@ -793,16 +499,12 @@ def iniciar_jogo():
                 elif evento.key == pygame.K_v:
                     if current_time - last_v_press_time > debounce_interval:
                         colisoes_restantes = (max_colisoes + vidas_extra) - colisoes
-                        falar_vidas_restantes(colisoes_restantes)
+                        # Apenas exibe no console, sem fala
+                        print(f"Vidas restantes: {colisoes_restantes}")
                         last_v_press_time = current_time
 
         if not rodando:
             break
-
-        current_time_for_score = time.time()
-        if current_time_for_score - last_score_speak_time >= score_speak_interval:
-            falar_pontuacao_total(pontos)
-            last_score_speak_time = current_time_for_score
 
         if time.time() - ultimo_tempo_evento >= tempo_entre_obstaculos_atual:
             evento_aleatorio = random.choices(
@@ -847,7 +549,7 @@ def iniciar_jogo():
                         elif evento.key == pygame.K_v:
                             if current_key_time - last_v_press_time > debounce_interval:
                                 colisoes_restantes = (max_colisoes + vidas_extra) - colisoes
-                                falar_vidas_restantes(colisoes_restantes)
+                                print(f"Vidas restantes: {colisoes_restantes}")
                                 last_v_press_time = current_key_time
                         
                         # --- Lógica para processar apenas a primeira tecla de jogo ---
@@ -871,17 +573,10 @@ def iniciar_jogo():
 
             # Após o loop de reação, verifica o resultado da ação para o obstáculo
             if not desviou and not jogo_encerrar:
-                # Se não desviou E uma ação de jogo não foi processada (nenhuma tecla de jogo pressionada)
-                # OU a tecla errada foi pressionada como primeira ação, então conta como colisão.
-                # A condição 'not acao_de_jogo_processada_neste_obstaculo' significa que nenhuma tecla de jogo foi pressionada
-                # A condição 'desviou' ser False significa que a tecla correta não foi a primeira pressionada (ou nenhuma foi)
                 colisoes += 1
                 tocar_som("colisao")
             elif desviou and not jogo_encerrar: # Se desviou (ou seja, a tecla certa foi a primeira)
                 pontos += 1
-
-                if pontos > 0 and pontos % 10 == 0:
-                    falar_nivel_progresso(pontos)
 
             tempo_entre_obstaculos_atual = max(min_tempo_obstaculo, tempo_base_entre_obstaculos - (pontos * aceleracao_por_ponto))
 
@@ -905,21 +600,13 @@ def iniciar_jogo():
             resultado = f"Dia {dia} de {mes_extenso} de {ano}, às {hora}:{minuto:02d}, {nome_computador} concluiu o jogo na dificuldade '{dificuldade_texto}' com {pontos} pontos, no nível {nivel_final}."
 
             pyperclip.copy(resultado)
-            # print("Fim de jogo!")
-            # print("Resultado copiado para a área de transferência:")
-            # print(resultado) # Não imprime para o console/log
+            print("Fim de jogo!")
+            print("Resultado copiado para a área de transferência:")
+            print(resultado)
 
-            time.sleep(0.5)
-            falar_universal(f"Você fez {pontos} pontos no nível {nivel_final}. Resultado copiado para a área de transferência.", prioridade=True)
-
-            timeout_start_sapi_end = time.time()
-            max_sapi_wait_at_end = 7
-            # Garante que o evento de término da fala final é setado
-            voz_sapi_terminou_evento.wait(timeout=max_sapi_wait_at_end)
-
-            if voz_sapi_ocupada:
-                # print("AVISO: [FIM] Fala final não terminou a tempo. Forçando parada do SAPI para encerrar o jogo.")
-                parar_fala_voz()
+            # Mostra resultado em dialog
+            wx.MessageBox(f"Você fez {pontos} pontos no nível {nivel_final}.\nResultado copiado para a área de transferência.", 
+                         "Fim de Jogo", wx.OK | wx.ICON_INFORMATION)
 
             rodando = False
             jogo_encerrar = True
@@ -933,30 +620,8 @@ if __name__ == "__main__":
     try:
         iniciar_jogo()
     finally:
-        if voz_sapi is not None:
-            try:
-                # print("INFO: Tentando finalizar voz SAPI...")
-                parar_fala_voz()
-                time.sleep(0.1)
-                # Desconecta o COM object para liberar recursos do sistema
-                if hasattr(voz_sapi, 'engine') and hasattr(voz_sapi.engine.proxy) and hasattr(voz_sapi.engine.proxy, 'disconnect'):
-                    voz_sapi.engine.proxy.disconnect()
-
-                voz_sapi.stop() # Chamado novamente para garantir a parada do runAndWait na thread
-                voz_sapi = None
-                # print("INFO: Voz SAPI finalizada com sucesso.")
-            except Exception as e:
-                # print(f"AVISO: Erro ao tentar finalizar voz SAPI no encerramento: {e}")
-                pass # Não exibe erro para o usuário final
-
         if pygame.get_init():
             pygame.quit()
-            # print("INFO: Pygame finalizado.")
-
-        # Não há mais logs para fechar ou restaurar os streams originais.
-        # Os prints foram comentados/removidos, e a classe DualOutput foi removida.
-
-        # print("INFO: Programa encerrado.") # Este print final não será visível com --noconsole
 
         if jogo_encerrar:
             sys.exit(0)
